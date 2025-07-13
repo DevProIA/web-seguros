@@ -40,6 +40,7 @@ import Button from '../atoms/Button.astro';
       <div class="flex items-center space-x-4">
         <ThemeToggle />
         
+        <!-- Auth Buttons (when not logged in) -->
         <div id="auth-buttons" class="hidden md:flex items-center space-x-3">
           <Button variant="ghost" size="sm" href="/login">
             Iniciar Sesión
@@ -201,11 +202,9 @@ import Button from '../atoms/Button.astro';
 </nav>
 
 <script>
-  import { isAuthenticated, userProfile, currentUser, initAuth, logout } from '../../stores/auth';
-  import { useStore } from '@nanostores/react';
-
   // Función para obtener iniciales del nombre
   function getInitials(name: string): string {
+    if (!name) return 'U';
     return name
       .split(' ')
       .map(word => word.charAt(0))
@@ -216,10 +215,19 @@ import Button from '../atoms/Button.astro';
 
   // Función para actualizar la UI con datos del usuario
   function updateUserUI(profile: any, user: any) {
-    const fullName = `${profile.nombre} ${profile.apellido || ''}`.trim();
-    const initials = getInitials(fullName);
-    const role = profile.role?.nombre_rol || 'Cliente';
-    const email = user?.email || '';
+    console.log('Updating user UI with:', { profile, user });
+    
+    if (!profile || !user) {
+      console.log('No profile or user data available');
+      return;
+    }
+
+    const fullName = `${profile.nombre || ''} ${profile.apellido || ''}`.trim();
+    const initials = getInitials(fullName || user.email || 'Usuario');
+    const role = profile.role?.roles || 'Cliente';
+    const email = user.email || '';
+
+    console.log('Calculated values:', { fullName, initials, role, email });
 
     // Actualizar elementos del menú desktop
     const userInitials = document.getElementById('user-initials');
@@ -230,10 +238,10 @@ import Button from '../atoms/Button.astro';
     const dropdownUserEmail = document.getElementById('dropdown-user-email');
 
     if (userInitials) userInitials.textContent = initials;
-    if (userName) userName.textContent = fullName;
+    if (userName) userName.textContent = fullName || 'Usuario';
     if (userRole) userRole.textContent = role;
     if (dropdownUserInitials) dropdownUserInitials.textContent = initials;
-    if (dropdownUserName) dropdownUserName.textContent = fullName;
+    if (dropdownUserName) dropdownUserName.textContent = fullName || 'Usuario';
     if (dropdownUserEmail) dropdownUserEmail.textContent = email;
 
     // Actualizar elementos del menú móvil
@@ -242,55 +250,106 @@ import Button from '../atoms/Button.astro';
     const mobileUserRole = document.getElementById('mobile-user-role');
 
     if (mobileUserInitials) mobileUserInitials.textContent = initials;
-    if (mobileUserName) mobileUserName.textContent = fullName;
+    if (mobileUserName) mobileUserName.textContent = fullName || 'Usuario';
     if (mobileUserRole) mobileUserRole.textContent = role;
+
+    console.log('User UI updated successfully');
   }
 
   // Función para mostrar/ocultar elementos según estado de autenticación
   function toggleAuthElements(authenticated: boolean) {
+    console.log('Toggling auth elements, authenticated:', authenticated);
+    
     const authButtons = document.getElementById('auth-buttons');
     const userMenu = document.getElementById('user-menu');
     const mobileAuthButtons = document.getElementById('mobile-auth-buttons');
     const mobileUserMenu = document.getElementById('mobile-user-menu');
 
     if (authenticated) {
-      authButtons?.classList.add('hidden');
-      userMenu?.style.setProperty('display', 'block');
-      mobileAuthButtons?.style.setProperty('display', 'none');
-      mobileUserMenu?.style.setProperty('display', 'block');
+      console.log('Showing user menu, hiding auth buttons');
+      if (authButtons) authButtons.style.display = 'none';
+      if (userMenu) userMenu.style.display = 'block';
+      if (mobileAuthButtons) mobileAuthButtons.style.display = 'none';
+      if (mobileUserMenu) mobileUserMenu.style.display = 'block';
     } else {
-      authButtons?.classList.remove('hidden');
-      userMenu?.style.setProperty('display', 'none');
-      mobileAuthButtons?.style.setProperty('display', 'block');
-      mobileUserMenu?.style.setProperty('display', 'none');
+      console.log('Showing auth buttons, hiding user menu');
+      if (authButtons) authButtons.style.display = 'flex';
+      if (userMenu) userMenu.style.display = 'none';
+      if (mobileAuthButtons) mobileAuthButtons.style.display = 'block';
+      if (mobileUserMenu) mobileUserMenu.style.display = 'none';
     }
   }
 
-  // Inicializar autenticación al cargar la página
+  // Inicializar cuando el DOM esté listo
   document.addEventListener('DOMContentLoaded', async () => {
-    await initAuth();
+    console.log('Navigation component loaded, initializing auth...');
     
-    // Suscribirse a cambios en el estado de autenticación
-    isAuthenticated.subscribe((authenticated) => {
-      toggleAuthElements(authenticated);
-    });
-
-    // Suscribirse a cambios en el perfil del usuario
-    userProfile.subscribe((profile) => {
+    try {
+      // Importar dinámicamente los stores de auth
+      const authModule = await import('../../stores/auth');
+      const { isAuthenticated, userProfile, currentUser, initAuth, logout } = authModule;
+      
+      console.log('Auth module loaded, initializing...');
+      await initAuth();
+      
+      // Verificar estado inicial
+      const authenticated = isAuthenticated.get();
+      const profile = userProfile.get();
       const user = currentUser.get();
-      if (profile && user) {
+      
+      console.log('Initial auth state:', { authenticated, profile: !!profile, user: !!user });
+      
+      toggleAuthElements(authenticated);
+      if (authenticated && profile && user) {
         updateUserUI(profile, user);
       }
-    });
 
-    // Verificar estado inicial
-    const authenticated = isAuthenticated.get();
-    const profile = userProfile.get();
-    const user = currentUser.get();
-    
-    toggleAuthElements(authenticated);
-    if (authenticated && profile && user) {
-      updateUserUI(profile, user);
+      // Suscribirse a cambios en el estado de autenticación
+      isAuthenticated.subscribe((authenticated) => {
+        console.log('Auth state changed:', authenticated);
+        toggleAuthElements(authenticated);
+      });
+
+      // Suscribirse a cambios en el perfil del usuario
+      userProfile.subscribe((profile) => {
+        console.log('Profile changed:', !!profile);
+        const user = currentUser.get();
+        if (profile && user) {
+          updateUserUI(profile, user);
+        }
+      });
+
+      // Suscribirse a cambios en el usuario actual
+      currentUser.subscribe((user) => {
+        console.log('Current user changed:', !!user);
+        const profile = userProfile.get();
+        if (profile && user) {
+          updateUserUI(profile, user);
+        }
+      });
+
+      // Event listeners para logout
+      const logoutBtn = document.getElementById('logout-btn');
+      const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+      
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          console.log('Logout clicked');
+          await logout();
+        });
+      }
+      
+      if (mobileLogoutBtn) {
+        mobileLogoutBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          console.log('Mobile logout clicked');
+          await logout();
+        });
+      }
+
+    } catch (error) {
+      console.error('Error initializing navigation auth:', error);
     }
   });
 
@@ -314,14 +373,5 @@ import Button from '../atoms/Button.astro';
     if (!button?.contains(event.target as Node) && !dropdown?.contains(event.target as Node)) {
       dropdown?.classList.add('hidden');
     }
-  });
-
-  // Logout functionality
-  document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    await logout();
-  });
-
-  document.getElementById('mobile-logout-btn')?.addEventListener('click', async () => {
-    await logout();
   });
 </script>

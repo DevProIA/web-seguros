@@ -35,14 +35,16 @@ export async function initAuth() {
 
 // Escuchar cambios de autenticación
 supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('Auth state change event:', event, !!session);
   if (event === 'SIGNED_IN' && session?.user) {
+    console.log('User signed in, getting profile...');
     const profile = await AuthService.getUserProfile(session.user.id);
-    if (profile) {
-      isAuthenticated.set(true);
-      currentUser.set(session.user);
-      userProfile.set(profile);
-    }
+    console.log('Profile loaded:', !!profile);
+    isAuthenticated.set(true);
+    currentUser.set(session.user);
+    userProfile.set(profile);
   } else if (event === 'SIGNED_OUT') {
+    console.log('User signed out');
     isAuthenticated.set(false);
     currentUser.set(null);
     userProfile.set(null);

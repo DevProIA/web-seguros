@@ -154,12 +154,12 @@ export class AuthService {
           id_rol,
           roles
         ),
-        ciudades (
+        ciudad (
           id_ciudad,
-          nombre_ciu,
+          nombre,
           departamentos (
-            id_depa,
-            nombre_depa
+            id_depar,
+            nombre
           )
         )
       `)
@@ -192,12 +192,12 @@ export class AuthService {
     id: data.roles.id_rol,
     nombre_rol: data.roles.roles
   } : undefined,
-  ciudad: data.ciudades ? {
-    id_ciudad: data.ciudades.id_ciudad,
-    nombre: data.ciudades.nombre_ciu,
-    departamento: data.ciudades.departamentos ? {
-      id_depar: data.ciudades.departamentos.id_depa,
-      nombre: data.ciudades.departamentos.nombre_depa
+  ciudad: data.ciudad ? {
+    id_ciudad: data.ciudad.id_ciudad,
+    nombre: data.ciudad.nombre,
+    departamento: data.ciudad.departamentos ? {
+      id_depar: data.ciudad.departamentos.id_depar,
+      nombre: data.ciudad.departamentos.nombre
     } : undefined
   } : undefined
 };
