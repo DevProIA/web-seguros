@@ -63,6 +63,7 @@ export class AuthService {
       if (authData.user) {
         console.log('User created, creating profile...');
         
+        // Crear perfil en la tabla users
         const { data: profileData, error: profileError } = await supabase
           .from('users')
           .insert({
@@ -78,15 +79,7 @@ export class AuthService {
             fecha_registro: new Date().toISOString(),
             id_estado_user: 1, // Activo por defecto
           })
-          .select(`
-            *,
-            roles!id_rol(id_rol, roles),
-            ciudad!id_ciudad(
-              id_ciudad, 
-              nombre_ciu, 
-              departamentos!id_depar(id_depar, nombre_depa)
-            )
-          `)
+          .select()
           .single();
 
         if (profileError) {
@@ -162,65 +155,102 @@ export class AuthService {
     try {
       console.log('Getting profile for user:', authId);
       
-      const { data, error } = await supabase
+      // Primero intentar obtener solo el perfil básico
+      const { data: basicProfile, error: basicError } = await supabase
         .from('users')
-        .select(`
-          *,
-          roles!id_rol (
-            id_rol,
-            roles
-          ),
-          ciudad!id_ciudad (
-            id_ciudad,
-            nombre_ciu,
-            departamentos!id_depar (
-              id_depar,
-              nombre_depa
-            )
-          )
-        `)
+        .select('*')
         .eq('id', authId)
         .single();
 
-      if (error) {
-        console.error('Profile fetch error:', error);
-        if (error.code === 'PGRST116') {
+      if (basicError) {
+        console.error('Basic profile fetch error:', basicError);
+        if (basicError.code === 'PGRST116') {
           console.log('User not found in users table');
           return null;
         }
-        throw error;
+        throw basicError;
       }
 
-      console.log('Raw profile data from DB:', data);
+      console.log('Basic profile data:', basicProfile);
+
+      // Intentar obtener el rol
+      let roleData = null;
+      if (basicProfile.id_rol) {
+        try {
+          const { data: role, error: roleError } = await supabase
+            .from('roles')
+            .select('id_rol, roles')
+            .eq('id_rol', basicProfile.id_rol)
+            .single();
+          
+          if (!roleError) {
+            roleData = role;
+          }
+        } catch (roleError) {
+          console.warn('Could not fetch role:', roleError);
+        }
+      }
+
+      // Intentar obtener la ciudad y departamento
+      let ciudadData = null;
+      if (basicProfile.id_ciudad) {
+        try {
+          const { data: ciudad, error: ciudadError } = await supabase
+            .from('ciudad')
+            .select('id_ciudad, nombre_ciu, id_depar')
+            .eq('id_ciudad', basicProfile.id_ciudad)
+            .single();
+          
+          if (!ciudadError && ciudad) {
+            ciudadData = {
+              id_ciudad: ciudad.id_ciudad,
+              nombre_ciu: ciudad.nombre_ciu,
+              departamento: null
+            };
+
+            // Intentar obtener el departamento
+            if (ciudad.id_depar) {
+              try {
+                const { data: depto, error: deptoError } = await supabase
+                  .from('departamentos')
+                  .select('id_depar, nombre_depa')
+                  .eq('id_depar', ciudad.id_depar)
+                  .single();
+                
+                if (!deptoError && depto) {
+                  ciudadData.departamento = {
+                    id_depar: depto.id_depar,
+                    nombre_depa: depto.nombre_depa
+                  };
+                }
+              } catch (deptoError) {
+                console.warn('Could not fetch departamento:', deptoError);
+              }
+            }
+          }
+        } catch (ciudadError) {
+          console.warn('Could not fetch ciudad:', ciudadError);
+        }
+      }
 
       const profile: UserProfile = {
-        id_users: data.id_users,
-        id: data.id,
-        nombre: data.nombre,
-        apellido: data.apellido,
-        direction: data.direction,
-        barrio: data.barrio,
-        fecha_registro: data.fecha_registro,
-        id_rol: data.id_rol,
-        id_ciudad: data.id_ciudad,
-        telefono: data.telefono,
-        email: data.email,
-        id_estado_user: data.id_estado_user,
-        role: data.roles ? {
-          id_rol: data.roles.id_rol,
-          roles: data.roles.roles
-        } : null,
-        ciudad: data.ciudad ? {
-          id_ciudad: data.ciudad.id_ciudad,
-          nombre_ciu: data.ciudad.nombre_ciu,
-          departamento: data.ciudad.departamentos ? {
-            id_depar: data.ciudad.departamentos.id_depar,
-            nombre_depa: data.ciudad.departamentos.nombre_depa
-          } : null
-        } : null
+        id_users: basicProfile.id_users,
+        id: basicProfile.id,
+        nombre: basicProfile.nombre,
+        apellido: basicProfile.apellido,
+        direction: basicProfile.direction,
+        barrio: basicProfile.barrio,
+        fecha_registro: basicProfile.fecha_registro,
+        id_rol: basicProfile.id_rol,
+        id_ciudad: basicProfile.id_ciudad,
+        telefono: basicProfile.telefono,
+        email: basicProfile.email,
+        id_estado_user: basicProfile.id_estado_user,
+        role: roleData,
+        ciudad: ciudadData
       };
 
-      console.log('Processed profile:', profile);
+      console.log('Final processed profile:', profile);
       return profile;
 
     } catch (error) {
@@ -237,21 +267,7 @@ export class AuthService {
         .from('users')
         .update(updates)
         .eq('id', userId)
-        .select(`
-          *,
-          roles!id_rol (
-            id_rol,
-            roles
-          ),
-          ciudad!id_ciudad (
-            id_ciudad,
-            nombre_ciu,
-            departamentos!id_depar (
-              id_depar,
-              nombre_depa
-            )
-          )
-        `)
+        .select()
         .single();
 
       if (error) {

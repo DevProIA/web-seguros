@@ -113,16 +113,26 @@ import Button from '../components/atoms/Button.astro';
       if (result.success) {
         console.log('Login successful, redirecting...');
         // Redirigir después de un breve delay para permitir que se actualice el estado
-        setTimeout(() => {
-          window.location.href = '/perfil';
-        }, 500);
+        window.location.href = '/perfil';
       } else {
         console.error('Login failed:', result.error);
         throw new Error(result.error || 'Error al iniciar sesión');
       }
     } catch (error) {
       console.error('Error de login:', error);
-      alert(`Error al iniciar sesión: ${error.message || 'Verifica tus credenciales'}`);
+      
+      let errorMessage = 'Error al iniciar sesión';
+      if (error.message) {
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Credenciales inválidas. Verifica tu email y contraseña.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Debes confirmar tu email antes de iniciar sesión.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       // Rehabilitar el botón
       submitBtn.disabled = false;
