@@ -13,7 +13,14 @@ import Button from '../components/atoms/Button.astro';
       <p class="text-gray-600 dark:text-gray-300 mt-2">Administra tu información personal y configuración de cuenta</p>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- Loading State -->
+    <div id="loading-state" class="text-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+      <p class="text-gray-600 dark:text-gray-300">Cargando perfil...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="profile-content" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
       <!-- Profile Summary -->
       <div class="lg:col-span-1">
         <Card class="text-center">
@@ -37,8 +44,8 @@ import Button from '../components/atoms/Button.astro';
               <span id="profile-member-since" class="text-gray-900 dark:text-white">2024</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-gray-500 dark:text-gray-400">Pólizas activas:</span>
-              <span class="text-gray-900 dark:text-white">3</span>
+              <span class="text-gray-500 dark:text-gray-400">ID Usuario:</span>
+              <span id="profile-user-id" class="text-gray-900 dark:text-white text-xs">-</span>
             </div>
           </div>
         </Card>
@@ -141,7 +148,7 @@ import Button from '../components/atoms/Button.astro';
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input
                 type="text"
-                name="direccion"
+                name="direction"
                 label="Dirección"
                 placeholder="Calle 123 #45-67"
               />
@@ -205,6 +212,20 @@ import Button from '../components/atoms/Button.astro';
         </Card>
       </div>
     </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="hidden text-center py-12">
+      <div class="mx-auto h-16 w-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+        <svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Error cargando perfil</h3>
+      <p class="text-gray-600 dark:text-gray-300 mb-4">No se pudo cargar la información del perfil</p>
+      <Button variant="primary" onclick="window.location.reload()">
+        Reintentar
+      </Button>
+    </div>
   </div>
 </MainLayout>
 
@@ -239,7 +260,7 @@ import Button from '../components/atoms/Button.astro';
         
         departamentos.forEach(depto => {
           const option = document.createElement('option');
-          option.value = depto.id_depa.toString();
+          option.value = depto.id_depar.toString();
           option.textContent = depto.nombre_depa;
           select.appendChild(option);
         });
@@ -276,7 +297,13 @@ import Button from '../components/atoms/Button.astro';
     const profile = userProfile.get();
     const user = currentUser.get();
     
-    if (!profile || !user) return;
+    console.log('Loading profile data:', { profile, user });
+    
+    if (!profile || !user) {
+      console.log('No profile or user data available');
+      showErrorState();
+      return;
+    }
 
     const fullName = `${profile.nombre} ${profile.apellido || ''}`.trim();
     const initials = getInitials(fullName);
@@ -286,10 +313,13 @@ import Button from '../components/atoms/Button.astro';
     const profileName = document.getElementById('profile-name');
     const profileRole = document.getElementById('profile-role');
     const profileMemberSince = document.getElementById('profile-member-since');
+    const profileUserId = document.getElementById('profile-user-id');
     
     if (profileInitials) profileInitials.textContent = initials;
-    if (profileName) profileName.textContent = fullName;
-    if (profileRole) profileRole.textContent = profile.role?.nombre_rol || 'Cliente';
+    if (profileName) profileName.textContent = fullName || 'Usuario';
+    if (profileRole) profileRole.textContent = profile.role?.roles || 'Cliente';
+    if (profileUserId) profileUserId.textContent = profile.id_users?.toString() || profile.id || '-';
+    
     if (profileMemberSince && profile.fecha_registro) {
       const date = new Date(profile.fecha_registro);
       profileMemberSince.textContent = date.getFullYear().toString();
@@ -298,20 +328,11 @@ import Button from '../components/atoms/Button.astro';
     // Llenar formulario
     const form = document.getElementById('profile-form') as HTMLFormElement;
     if (form) {
-      const formData = new FormData();
-      formData.set('nombre', profile.nombre);
-      formData.set('apellido', profile.apellido || '');
-      formData.set('email', user.email || '');
-      formData.set('telefono', profile.telefono?.toString() || '');
-      formData.set('direccion', profile.direction || '');
-      formData.set('barrio', profile.barrio || '');
-      
-      // Llenar campos del formulario
-      (form.querySelector('[name="nombre"]') as HTMLInputElement).value = profile.nombre;
+      (form.querySelector('[name="nombre"]') as HTMLInputElement).value = profile.nombre || '';
       (form.querySelector('[name="apellido"]') as HTMLInputElement).value = profile.apellido || '';
       (form.querySelector('[name="email"]') as HTMLInputElement).value = user.email || '';
       (form.querySelector('[name="telefono"]') as HTMLInputElement).value = profile.telefono?.toString() || '';
-      (form.querySelector('[name="direccion"]') as HTMLInputElement).value = profile.direction || '';
+      (form.querySelector('[name="direction"]') as HTMLInputElement).value = profile.direction || '';
       (form.querySelector('[name="barrio"]') as HTMLInputElement).value = profile.barrio || '';
       
       // Seleccionar departamento y ciudad si están disponibles
@@ -328,18 +349,61 @@ import Button from '../components/atoms/Button.astro';
         }
       }
     }
+
+    showProfileContent();
+  }
+
+  function showLoadingState() {
+    document.getElementById('loading-state')?.classList.remove('hidden');
+    document.getElementById('profile-content')?.classList.add('hidden');
+    document.getElementById('error-state')?.classList.add('hidden');
+  }
+
+  function showProfileContent() {
+    document.getElementById('loading-state')?.classList.add('hidden');
+    document.getElementById('profile-content')?.classList.remove('hidden');
+    document.getElementById('error-state')?.classList.add('hidden');
+  }
+
+  function showErrorState() {
+    document.getElementById('loading-state')?.classList.add('hidden');
+    document.getElementById('profile-content')?.classList.add('hidden');
+    document.getElementById('error-state')?.classList.remove('hidden');
   }
 
   // Event listeners
   document.addEventListener('DOMContentLoaded', async () => {
-    await initAuth();
-    await loadDepartamentos();
-    loadProfileData();
+    console.log('Profile page loaded, initializing...');
+    showLoadingState();
     
-    // Suscribirse a cambios en el perfil
-    userProfile.subscribe(() => {
+    try {
+      await initAuth();
+      await loadDepartamentos();
+      
+      // Verificar si hay datos de usuario
+      const profile = userProfile.get();
+      const user = currentUser.get();
+      
+      if (profile && user) {
+        loadProfileData();
+      } else {
+        console.log('No user data, redirecting to login');
+        window.location.href = '/login';
+      }
+      
+    } catch (error) {
+      console.error('Error initializing profile page:', error);
+      showErrorState();
+    }
+  });
+
+  // Suscribirse a cambios en el perfil
+  userProfile.subscribe(() => {
+    const profile = userProfile.get();
+    const user = currentUser.get();
+    if (profile && user) {
       loadProfileData();
-    });
+    }
   });
 
   // Cambio de departamento
@@ -363,10 +427,10 @@ import Button from '../components/atoms/Button.astro';
     e.preventDefault();
     
     const formData = new FormData(e.target as HTMLFormElement);
-    const profile = userProfile.get();
+    const user = currentUser.get();
     
-    if (!profile) {
-      alert('Error: No se pudo obtener el perfil del usuario');
+    if (!user) {
+      alert('Error: No se pudo obtener el usuario actual');
       return;
     }
     
@@ -374,13 +438,13 @@ import Button from '../components/atoms/Button.astro';
       nombre: formData.get('nombre') as string,
       apellido: formData.get('apellido') as string,
       telefono: parseInt(formData.get('telefono') as string) || null,
-      direction: formData.get('direccion') as string,
+      direction: formData.get('direction') as string,
       barrio: formData.get('barrio') as string,
       id_ciudad: parseInt(formData.get('ciudad_id') as string) || null,
     };
     
     try {
-      await AuthService.updateProfile(profile.id!, updates);
+      await AuthService.updateProfile(user.id, updates);
       alert('Perfil actualizado exitosamente');
       // Recargar datos del perfil
       await initAuth();

@@ -20,8 +20,8 @@ export class LocationService {
     try {
       const { data, error } = await supabase
         .from('departamentos')
-        .select('*')
-        .order('nombre');
+        .select('id_depar, nombre_depa')
+        .order('nombre_depa');
 
       if (error) throw error;
       return data || [];
@@ -36,9 +36,9 @@ export class LocationService {
     try {
       const { data, error } = await supabase
         .from('ciudad')
-        .select('*')
+        .select('id_ciudad, nombre_ciu, id_depar')
         .eq('id_depar', departamentoId)
-        .order('nombre');
+        .order('nombre_ciu');
 
       if (error) throw error;
       return data || [];
