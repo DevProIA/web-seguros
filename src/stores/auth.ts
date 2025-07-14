@@ -87,7 +87,7 @@ export async function register(email: string, password: string, userData: {
   apellido?: string;
   direccion?: string;
   barrio?: string;
-  id_ciudad?: number;
+  ciudadId?: number;
   telefono?: number;
   email?: string;
 }) {

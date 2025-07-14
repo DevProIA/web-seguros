@@ -38,7 +38,7 @@ export class AuthService {
       apellido?: string;
       direccion?: string;
       barrio?: string;
-      id_ciudad?: number;
+      ciudadId?: number;
       telefono?: number;
       email?: string;
     }
@@ -66,7 +66,7 @@ export class AuthService {
             apellido: userData.apellido || null,
             direction: userData.direccion || null,
             barrio: userData.barrio || null,
-            id_ciudad: userData.id_ciudad || null,
+            id_ciudad: userData.ciudadId || null,
             telefono: userData.telefono || null,
             id_rol: 1, // Usuario por defecto
             email: userData.email || authData.user.email,
@@ -74,8 +74,8 @@ export class AuthService {
           })
           .select(
             `*,
-            roles(id_rol, roles),
-            ciudades(id_ciudad, nombre_ciu, departamentos(id_depa, nombre_depa))`
+            roles!id_rol(id_rol, roles),
+            ciudad!id_ciudad(id_ciudad, nombre_ciu, departamentos!id_depar(id_depar, nombre_depa))`
           )
           .single();
 
@@ -150,16 +150,16 @@ export class AuthService {
       .from('users')
       .select(`
         *,
-        roles (
+        roles!id_rol (
           id_rol,
           roles
         ),
-        ciudad (
+        ciudad!id_ciudad (
           id_ciudad,
-          nombre,
-          departamentos (
+          nombre_ciu,
+          departamentos!id_depar (
             id_depar,
-            nombre
+            nombre_depa
           )
         )
       `)
@@ -186,7 +186,7 @@ export class AuthService {
   id_rol: data.id_rol,
   id_ciudad: data.id_ciudad,
   telefono: data.telefono,
-  direction: data.direccion,
+  direction: data.direction,
   email: data.email,
   role: data.roles ? {
     id: data.roles.id_rol,
@@ -194,10 +194,10 @@ export class AuthService {
   } : undefined,
   ciudad: data.ciudad ? {
     id_ciudad: data.ciudad.id_ciudad,
-    nombre: data.ciudad.nombre,
+    nombre: data.ciudad.nombre_ciu,
     departamento: data.ciudad.departamentos ? {
       id_depar: data.ciudad.departamentos.id_depar,
-      nombre: data.ciudad.departamentos.nombre
+      nombre: data.ciudad.departamentos.nombre_depa
     } : undefined
   } : undefined
 };
